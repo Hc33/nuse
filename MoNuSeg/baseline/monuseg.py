@@ -39,13 +39,13 @@ class RandomRotate:
 
 
 class RandomCrop:
-    def __init__(self, size=51):
+    def __init__(self, size=256):
         self.size = size, size
 
     def __call__(self, image, mask):
         y, x, height, width = tr.RandomCrop.get_params(image, self.size)
         patch = fn.crop(image, y, x, height, width)
-        label = fn.crop(mask, y, x, height, width)
+        label = mask[y:y+height, x:x+width][::2, ::2]
         return patch, label
 
 
@@ -56,9 +56,10 @@ class MoNuSegTransform:
 
     def __call__(self, image, mask):
         patch, label = self.crop(image, mask)
-        patch = self.rot(patch, mask)
+        #patch, label = self.rot(patch, label)
         patch = fn.to_tensor(patch)
-        return patch, label
+        return patch, torch.from_numpy(label).long()
+
 
 
 class MoNuSeg(Dataset):

@@ -69,6 +69,3 @@ class FCN(nn.Module):
         feature = self.up1(down1, up2)
         return self.predict(feature)
 
-
-fcn = FCN()
-print(fcn(torch.zeros(1, 3, 256, 256)).size())
