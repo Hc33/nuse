@@ -53,11 +53,13 @@ class MoNuSegTransform:
     def __init__(self):
         self.crop = RandomCrop()
         self.rot = RandomRotate()
+        self.norm = tr.Normalize(mean=[0.7198306, 0.43624926, 0.5741127], std=[0.13865258, 0.18120667, 0.14840752])
 
     def __call__(self, image, mask):
         patch, label = self.crop(image, mask)
         #patch, label = self.rot(patch, label)
-        patch = fn.to_tensor(patch)
+        patch = self.norm(fn.to_tensor(patch))
+
         return patch, torch.from_numpy(label).long()
 
 

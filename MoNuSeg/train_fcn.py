@@ -11,14 +11,15 @@ from baseline.monuseg import MoNuSeg
 def train(num_epoch, device):
     model = FCN().cuda(device=device)
     model.train()
-    optimizer = torch.optim.Adadelta(model.parameters())
+    optimizer = torch.optim.Adadelta(model.parameters(), lr=0.5)
     dataset = MoNuSeg('monuseg.pth', training=True)
     loader = DataLoader(dataset, batch_size=64, shuffle=True)
     for epoch in range(1, num_epoch + 1):
         for iteration, (image, label) in enumerate(loader):
+            batch_size = image.size(0)
             image = image.to(device)
-            hypot = model(image).view(64, 3, -1)
-            truth = label.to(device).view(64, -1)
+            hypot = model(image).view(batch_size, 3, -1)
+            truth = label.to(device).view(batch_size, -1)
 
             loss = cross_entropy(hypot, truth)
             optimizer.zero_grad()
@@ -28,7 +29,7 @@ def train(num_epoch, device):
                 loss = loss.item()
                 accuracy = (hypot.max(dim=1)[1] == truth).long().sum().item() / label.numel()
 
-            print(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f} accuracy = {accuracy:.4f}')
+            print(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f} accuracy = {accuracy:.4f} {label.float().mean() / 2}')
         if epoch % 16:
             torch.save(model.state_dict(), f'snapshot/{epoch}.pth')
 
