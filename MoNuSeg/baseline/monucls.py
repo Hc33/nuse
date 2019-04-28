@@ -1,6 +1,5 @@
 # encoding: UTF-8
 
-import random
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as tr
@@ -20,22 +19,14 @@ class Rotation:
         return fn.rotate(image, self.degree)
 
 
-class RandomRotate:
+class RandomRotate(tr.RandomChoice):
     def __init__(self):
-        self.choices = [
+        super().__init__([
             ByPass(),
             Rotation(degree=90),
             Rotation(degree=180),
             Rotation(degree=270)
-        ]
-
-    def __call__(self, image, mask):
-        transform = random.choice(self.choices)
-        image = transform(image)
-        mask = fn.to_pil_image(mask)
-        mask = transform(mask)
-        mask = fn.to_tensor(mask)
-        return image, mask
+        ])
 
 
 class RandomCrop:
@@ -45,7 +36,7 @@ class RandomCrop:
     def __call__(self, image, mask):
         y, x, height, width = tr.RandomCrop.get_params(image, self.size)
         patch = fn.crop(image, y, x, height, width)
-        label = fn.crop(mask, y, x, height, width)
+        label = mask[y + height // 2, x + width // 2]
         return patch, label
 
 
@@ -56,13 +47,13 @@ class MoNuSegTransform:
 
     def __call__(self, image, mask):
         patch, label = self.crop(image, mask)
-        patch = self.rot(patch, mask)
+        # patch = self.rot(patch)
         patch = fn.to_tensor(patch)
         return patch, label
 
 
 class MoNuSeg(Dataset):
-    def __init__(self, pth_file: str, multiplier=16,
+    def __init__(self, pth_file: str, sample_per_image=64, iteration_per_epoch=1000,
                  training=True, same_organ_testing=False, different_organ_testing=False):
         self.pth_file = pth_file
         error_message = 'choose one of training | same_organ_testing | different_organ_testing, no less, no more.'
@@ -83,13 +74,19 @@ class MoNuSeg(Dataset):
 
         self.dataset = [by_patient_id[p][:2] for p in pid]
         self.is_training = training
+        self.iteration_per_epoch = iteration_per_epoch
+        self.sample_per_image = sample_per_image
         if self.is_training:
             self.transform = MoNuSegTransform()
-        self.multiplier = multiplier
 
     def __len__(self):
-        return len(self.dataset) * self.multiplier
+        return self.iteration_per_epoch
 
     def __getitem__(self, idx):
-        image, mask = self.dataset[idx % len(self.dataset)]
-        return self.transform(image, mask)
+        batch_image, batch_label = [], []
+        for image, mask in self.dataset:
+            for _ in range(self.sample_per_image):
+                patch, patch_label = self.transform(image, mask)
+                batch_image.append(patch)
+                batch_label.append(patch_label)
+        return torch.stack(batch_image, dim=0), torch.tensor(batch_label).long()
