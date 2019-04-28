@@ -47,7 +47,8 @@ class MoNuSegTransform:
 
     def __call__(self, image, mask):
         patch, label = self.crop(image, mask)
-        patch = self.rot(patch)
+        # patch = self.rot(patch)
+        patch = fn.to_tensor(patch)
         return patch, label
 
 
@@ -61,6 +62,7 @@ class MoNuSeg(Dataset):
         dataset = torch.load(self.pth_file)
         by_patient_id = dataset['by_patient_id']
         by_organ = dataset['by_organ']
+
         if training:
             pid = by_organ['Breast'][:4] + by_organ['Liver'][:4] + by_organ['Kidney'][:4] + by_organ['Prostate'][:4]
         elif same_organ_testing:
@@ -78,7 +80,7 @@ class MoNuSeg(Dataset):
             self.transform = MoNuSegTransform()
 
     def __len__(self):
-        return len(self.dataset) * self.sample_per_image * self.iteration_per_epoch
+        return self.iteration_per_epoch
 
     def __getitem__(self, idx):
         batch_image, batch_label = [], []
