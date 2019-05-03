@@ -7,6 +7,9 @@ from torch.utils.data import Dataset
 import torchvision.transforms as tr
 import torchvision.transforms.functional as fn
 
+MoNuSeg_MEAN = [0.7198306, 0.43624926, 0.5741127]
+MoNuSeg_STD = [0.13865258, 0.18120667, 0.14840752]
+
 
 class ByPass:
     def __call__(self, *args):
@@ -19,7 +22,7 @@ class Rotation:
 
     def __call__(self, image, mask):
         image = fn.rotate(image, self.degree)
-        mask = np.rot90(mask, k=self.degree // 90)
+        mask = np.rot90(mask, k=self.degree // 90, axes=(1, 2))
         return image, np.ascontiguousarray(mask)
 
 
@@ -38,47 +41,53 @@ class RandomRotate:
         return image, mask
 
 
-class RandomCrop:
-    def __init__(self, size=256):
-        self.size = size, size
+def unnormalize(tensor, mean, std, inplace=True):
+    if not inplace:
+        tensor = tensor.clone()
+    if tensor.dim() == 3:
+        for channel, m, s in zip(tensor, mean, std):
+            channel.mul_(s).add_(m)
+    else:
+        for instance in tensor:
+            unnormalize(instance, mean, std, inplace)
+    return tensor
 
-    def __call__(self, image, mask):
-        y, x, height, width = tr.RandomCrop.get_params(image, self.size)
-        patch = fn.crop(image, y, x, height, width)
-        label = mask[y:y+height, x:x+width][::2, ::2]
-        return patch, label
+
+class Unnormalize:
+    def __init__(self, mean, std, inplace=True):
+        self.mean, self.std, self.inplace = mean, std, inplace
+
+    def __call__(self, tensor):
+        return unnormalize(tensor, self.mean, self.std, self.inplace)
 
 
 class MoNuSegTransform:
     def __init__(self):
-        self.crop = RandomCrop()
         self.rot = RandomRotate()
-        self.norm = tr.Normalize(mean=[0.7198306, 0.43624926, 0.5741127],
-                                 std=[0.13865258, 0.18120667, 0.14840752])
+        self.norm = tr.Normalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD)
 
-    def __call__(self, image, mask):
-        patch, label = self.crop(image, mask)
-        patch, label = self.rot(patch, label)
-        patch = self.norm(fn.to_tensor(patch))
+    def __call__(self, image, label):
+        image, label = self.rot(image, label)
+        image = self.norm(fn.to_tensor(image))
 
-        return patch, torch.from_numpy(label).long()
+        return image, torch.from_numpy(label).long()
 
 
 class MoNuSegTestTransform:
     def __init__(self):
-        self.norm = tr.Normalize(mean=[0.7198306, 0.43624926, 0.5741127],
-                                 std=[0.13865258, 0.18120667, 0.14840752])
+        self.norm = tr.Normalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD)
         self.pad = tr.Pad(12, padding_mode='reflect')
 
     def __call__(self, image, mask):
         image = self.norm(fn.to_tensor(self.pad(image)))
-        mask = torch.from_numpy(mask[::2, ::2]).long()
+        mask = torch.from_numpy(mask)
         return image, mask
 
 
 class MoNuSeg(Dataset):
-    def __init__(self, pth_file: str, multiplier=16,
-                 training=True, same_organ_testing=False, different_organ_testing=False):
+    def __init__(self, pth_file: str, size=256, stride=248,
+                 training=False, same_organ_testing=False, different_organ_testing=False,
+                 image_size=1000):
         self.pth_file = pth_file
         error_message = 'choose one of training | same_organ_testing | different_organ_testing, no less, no more.'
         if int(training) + int(same_organ_testing) + int(different_organ_testing) != 1:
@@ -91,24 +100,43 @@ class MoNuSeg(Dataset):
             pid = by_organ['Breast'][:4] + by_organ['Liver'][:4] + by_organ['Kidney'][:4] + by_organ['Prostate'][:4]
         elif same_organ_testing:
             pid = by_organ['Breast'][4:] + by_organ['Liver'][4:] + by_organ['Kidney'][4:] + by_organ['Prostate'][4:]
-            multiplier = 1
         elif different_organ_testing:
             pid = by_organ['Bladder'] + by_organ['Colon'] + by_organ['Stomach']
-            multiplier = 1
         else:
             raise ValueError(error_message)
 
-        self.dataset = [by_patient_id[p][:2] for p in pid]
+        self.dataset = [by_patient_id[p][:3] for p in pid]
         self.is_training = training
         if self.is_training:
             self.transform = MoNuSegTransform()
         else:
             self.transform = MoNuSegTestTransform()
-        self.multiplier = multiplier
+        self.crop_size = size
+        self.stride = stride
+        self.step = image_size // stride
+        self.num_crops = self.step * self.step
 
     def __len__(self):
-        return len(self.dataset) * self.multiplier
+        return len(self.dataset) * self.num_crops
 
     def __getitem__(self, idx):
-        image, mask = self.dataset[idx % len(self.dataset)]
-        return self.transform(image, mask)
+        if self.is_training:
+            return self.training_sample(idx)
+        return self.test_sample(idx)
+
+    def training_sample(self, idx):
+        sample_id, crop_id = divmod(idx, self.num_crops)
+        step_y, step_x = divmod(crop_id, self.step)
+        x = step_x * self.stride
+        y = step_x * self.stride
+        image, label, _ = self.dataset[sample_id]
+        image = fn.crop(image, y, x, self.crop_size, self.crop_size)
+        label = label[:, y:y+self.crop_size, x:y+self.crop_size]
+        return self.transform(image, label)
+
+    def test_sample(self, idx):
+        image, label, _ = self.dataset[idx % len(self.dataset)]
+        return self.transform(image, label)
+
+    def get_regions(self, idx):
+        return self.dataset[idx % len(self.dataset)][2]
