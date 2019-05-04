@@ -1,75 +1,18 @@
 # encoding: UTF-8
 
-import torch
-from torch.optim.adadelta import Adadelta
-from torch.optim.adam import Adam
-from torch.optim.sgd import SGD
-from torch.utils.data import DataLoader
-from nuse.fcn import FCN
 import argparse
-from ignite.engine import create_supervised_evaluator as create_evaluator
-from ignite.engine import _prepare_batch as prepare_batch
-from torch.nn.utils.clip_grad import clip_grad_norm_
+
+import torch
 from ignite.engine import Events, Engine
+from ignite.engine import create_supervised_evaluator as create_evaluator
 from ignite.handlers import ModelCheckpoint
-from nuse.monuseg import MoNuSeg
-from nuse.loss import dice
+from torch.utils.data import DataLoader
+
 import nuse.logging
-from dataclasses import dataclass
-
-
-@dataclass
-class MultiLoss:
-    outside: torch.tensor
-    boundary: torch.tensor
-    inside: torch.tensor
-    overall: torch.torch
-
-    def backward(self):
-        return self.overall.backward()
-
-
-@dataclass
-class Output:
-    prediction: torch.tensor
-    loss: MultiLoss
-
-
-def create_trainer(device: torch.device, model: torch.nn.Module, optimizer, loss_fn, non_blocking=False, clip_grad=50):
-    def on_iteration(engine, batch):
-        model.train()
-        optimizer.zero_grad()
-        x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
-        y_pred = model(x)
-        loss = loss_fn(y_pred, y)
-        loss.backward()
-        if clip_grad is not None:
-            clip_grad_norm_(model.parameters(), max_norm=clip_grad)
-        optimizer.step()
-        return Output(prediction=y_pred, loss=loss)
-
-    return Engine(on_iteration)
-
-
-def create_optimizer(name, parameters, lr):
-    if name == 'Adadelta':
-        return Adadelta(parameters, lr=lr)
-    elif name == 'Adam':
-        return Adam(parameters, lr=lr)
-    elif name == 'SGD':
-        return SGD(parameters, lr=lr)
-    else:
-        raise KeyError('Unknown optimizer type {!r}. Choose from [Adadelta | Adam | SGD]')
-
-
-def criterion(hypot, label):
-    h_outside, h_boundary, h_inside = map(lambda t: t.unsqueeze(1), torch.split(hypot, 1, dim=1))
-    y_outside, y_boundary, y_inside = map(lambda t: t.unsqueeze(1), torch.split(label.float(), 1, dim=1))
-    loss_outside = dice(h_outside, y_outside)
-    loss_boundary = dice(h_boundary, y_boundary)
-    loss_inside = dice(h_inside, y_inside)
-    loss = loss_outside + loss_boundary + loss_inside
-    return MultiLoss(outside=loss_outside, boundary=loss_boundary, inside=loss_inside, overall=loss)
+from nuse.fcn import FCN
+from nuse.loss import criterion
+from nuse.monuseg import MoNuSeg
+from nuse.trainer import *
 
 
 def train(args):

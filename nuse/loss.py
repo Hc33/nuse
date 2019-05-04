@@ -25,3 +25,11 @@ def bce_loss(h, y, k=None):
     return (worst + random) / 2
 
 
+def criterion(hypot, label):
+    h_outside, h_boundary, h_inside = map(lambda t: t.unsqueeze(1), torch.split(hypot, 1, dim=1))
+    y_outside, y_boundary, y_inside = map(lambda t: t.unsqueeze(1), torch.split(label.float(), 1, dim=1))
+    loss_outside = dice(h_outside, y_outside)
+    loss_boundary = dice(h_boundary, y_boundary)
+    loss_inside = dice(h_inside, y_inside)
+    loss = loss_outside + loss_boundary + loss_inside
+    return MultiLoss(outside=loss_outside, boundary=loss_boundary, inside=loss_inside, overall=loss)
