@@ -1,12 +1,13 @@
 # encoding: UTF-8
 
 import torch
-import torch.optim
+from torch.optim.adadelta import Adadelta
 from torch.utils.data import DataLoader
 from nuse.fcn import FCN
 import argparse
 from ignite.engine import create_supervised_evaluator as create_evaluator
-from ignite.engine import create_supervised_trainer as create_trainer
+from ignite.engine import _prepare_batch as prepare_batch
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from ignite.engine import Events, Engine
 from ignite.handlers import ModelCheckpoint
 from nuse.monuseg import MoNuSeg
@@ -31,9 +32,21 @@ class Output:
     prediction: torch.tensor
     loss: MultiLoss
 
-    @staticmethod
-    def from_ignite(x, y, y_pred, loss):
+
+def create_trainer(device: torch.device, model: torch.nn.Module, optimizer, loss_fn, non_blocking=False, clip_grad=50):
+    def on_iteration(engine, batch):
+        model.train()
+        optimizer.zero_grad()
+        x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+        y_pred = model(x)
+        loss = loss_fn(y_pred, y)
+        loss.backward()
+        if clip_grad is not None:
+            clip_grad_norm_(model.parameters(), max_norm=clip_grad)
+        optimizer.step()
         return Output(prediction=y_pred, loss=loss)
+
+    return Engine(on_iteration)
 
 
 def criterion(hypot, label):
@@ -47,11 +60,12 @@ def criterion(hypot, label):
 
 
 def train(args):
-    model = FCN()
+    model = FCN().to(args.device)
     if args.model_state:
         model.load_state_dict(torch.load(args.recover, 'cpu'))
-    optimizer = torch.optim.Adadelta(model.parameters(), lr=0.5)
-    trainer = create_trainer(model, optimizer, criterion, device=args.device, output_transform=Output.from_ignite)
+    optimizer = Adadelta(model.parameters(), lr=args.lr)
+    trainer = create_trainer(args.device, model, optimizer, criterion, criterion, clip_grad=args.clip_grad)
+    train_loader = DataLoader(MoNuSeg(args.datapack, training=True), batch_size=args.batch_size, shuffle=True)
     evaluator_so = create_evaluator(model, metrics={}, device=args.device)
     evaluator_do = create_evaluator(model, metrics={}, device=args.device)
     so_test_loader = DataLoader(MoNuSeg(args.datapack, same_organ_testing=True), batch_size=2, shuffle=False)
@@ -61,13 +75,17 @@ def train(args):
     nuse.logging.setup_testing_logger(evaluator_so, organs=['Breast', 'Liver', 'Kidney', 'Prostate'])
     nuse.logging.setup_testing_logger(evaluator_do, organs=['Bladder', 'Colon', 'Stomach'])
 
+    logger = nuse.logging.setup_testing_logger(trainer, args.log_filename)
+
     @trainer.on(Events.EPOCH_STARTED)
     def log_next_epoch(e: Engine):
-        print(f'Starting epoch {e.state.epoch:4d} / {e.state.max_epochs:4d}')
+        logger.info(f'Starting epoch {e.state.epoch:4d} / {e.state.max_epochs:4d}')
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training_loss(e: Engine):
-        print(f'Epoch {e.state.epoch:4d} Iteration {e.state.iteration:4d} loss = {e.state.output.loss.overall:.4f}')
+        epoch, iteration, loss = e.state.epoch, e.state.iteration, e.state.output.loss.overall
+        iteration %= len(train_loader)
+        logger.info(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f}')
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def trigger_evaluation(e: Engine):
@@ -84,7 +102,6 @@ def train(args):
                                               require_empty=False),
                               {'model': model, 'optimizer': optimizer})
 
-    train_loader = DataLoader(MoNuSeg(args.datapack, training=True), batch_size=32, shuffle=True)
     trainer.run(train_loader, max_epochs=args.max_epochs)
 
 
@@ -97,6 +114,9 @@ def build_argparser():
 
     ap.add_argument('--max_epochs', type=int, default=128, help='how many epochs you want')
     ap.add_argument('--evaluate_interval', type=int, default=16)
+    ap.add_argument('--lr', type=float, default=1.0)
+    ap.add_argument('--batch_size', type=int, default=32)
+    ap.add_argument('--clip_grad', type=float, default=50)
 
     ap.add_argument('--snapshot_dir', type=str, default='snapshot', help='snapshot file to recover')
     ap.add_argument('--snapshot_interval', type=int, default=16)
@@ -105,6 +125,8 @@ def build_argparser():
     ap.add_argument('--visdom_server', type=str, default='localhost')
     ap.add_argument('--visdom_port', type=int, default=8097)
     ap.add_argument('--visdom_env', type=str, default=None)
+
+    ap.add_argument('--log_filename', type=str, default='nuse.log')
     return ap
 
 
