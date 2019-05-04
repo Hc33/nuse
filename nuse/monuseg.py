@@ -43,6 +43,19 @@ class RandomRotate:
         return image, mask
 
 
+class RandomMirror:
+    def __call__(self, image, label):
+        if random.random() > 0.5:
+            # left-right
+            image = fn.hflip(image)
+            label = np.flip(label, (2,))
+        if random.random() > 0.5:
+            # top-bottom
+            image = fn.vflip(image)
+            label = np.flip(label, (1,))
+        return image, label
+
+
 def unnormalize(tensor, mean, std, inplace=True):
     if not inplace:
         tensor = tensor.clone()
@@ -66,10 +79,12 @@ class Unnormalize:
 class MoNuSegTransform:
     def __init__(self):
         self.rot = RandomRotate()
+        self.mirror = RandomMirror()
         self.norm = tr.Normalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD)
 
     def __call__(self, image, label):
         image, label = self.rot(image, label)
+        image, label = self.mirror(image, label)
         image = self.norm(fn.to_tensor(image))
 
         return image, torch.from_numpy(label > 0).float()
