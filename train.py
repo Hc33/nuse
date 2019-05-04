@@ -75,7 +75,7 @@ def train(args):
     nuse.logging.setup_testing_logger(evaluator_so, organs=['Breast', 'Liver', 'Kidney', 'Prostate'])
     nuse.logging.setup_testing_logger(evaluator_do, organs=['Bladder', 'Colon', 'Stomach'])
 
-    logger = nuse.logging.setup_testing_logger(trainer, args.log_filename)
+    logger = nuse.logging.setup_training_logger(trainer, args.log_filename)
 
     @trainer.on(Events.EPOCH_STARTED)
     def log_next_epoch(e: Engine):

@@ -6,11 +6,19 @@ from nuse.monuseg import Unnormalize, MoNuSeg_STD, MoNuSeg_MEAN
 import logging
 
 
+def _get_loss(output):
+    loss = output.loss
+    return dict(overall=loss.overall.item(),
+                inside=loss.inside.item(),
+                boundary=loss.boundary.item(),
+                outside=loss.outside.item())
+
+
 def setup_training_visdom_logger(trainer, model, optimizer, args):
     logger = vl.VisdomLogger(args.visdom_server, args.visdom_port, env=args.visdom_env, use_incoming_socket=False)
 
     logger.attach(trainer, event_name=Events.ITERATION_COMPLETED,
-                  log_handler=vl.OutputHandler(tag='loss', output_transform=lambda loss: {'loss': loss}))
+                  log_handler=vl.OutputHandler(tag='loss', output_transform=_get_loss))
 
     logger.attach(trainer, event_name=Events.EPOCH_COMPLETED,
                   log_handler=vl.GradsScalarHandler(model.predict))
@@ -35,6 +43,7 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
 
 def setup_training_logger(trainer, log_filename=None):
     logger = trainer._logger  # type: logging.Logger
+    logger.handlers.clear()
     fmt = logging.Formatter(fmt='[%(asctime)s][%(levelname)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     if log_filename is not None:
         writer = logging.FileHandler(log_filename)
