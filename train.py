@@ -33,7 +33,7 @@ class Output:
 
     @staticmethod
     def from_ignite(x, y, y_pred, loss):
-        return Output(prediction=y_pred, loss=loss.item())
+        return Output(prediction=y_pred, loss=loss)
 
 
 def criterion(hypot, label):
@@ -48,10 +48,8 @@ def criterion(hypot, label):
 
 def train(args):
     model = FCN()
-    if args.snapshot is not None:
-        print('Loading', args.snapshot)
-        snapshot = torch.load(args.snapshot, 'cpu')
-        model.load_state_dict(snapshot)
+    if args.model_state:
+        model.load_state_dict(torch.load(args.recover, 'cpu'))
     optimizer = torch.optim.Adadelta(model.parameters(), lr=0.5)
     trainer = create_trainer(model, optimizer, criterion, device=args.device, output_transform=Output.from_ignite)
     evaluator_so = create_evaluator(model, metrics={}, device=args.device)
@@ -69,7 +67,7 @@ def train(args):
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training_loss(e: Engine):
-        print(f'Epoch {e.state.epoch:4d} Iteration {e.state.iteration:4d} loss = {e.state.output.item():.4f}')
+        print(f'Epoch {e.state.epoch:4d} Iteration {e.state.iteration:4d} loss = {e.state.output.loss.overall:.4f}')
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def trigger_evaluation(e: Engine):
@@ -82,10 +80,11 @@ def train(args):
                               ModelCheckpoint(args.snapshot_dir, args.name,
                                               save_interval=args.snapshot_interval,
                                               n_saved=args.snapshot_max_history,
-                                              save_as_state_dict=True),
+                                              save_as_state_dict=True,
+                                              require_empty=False),
                               {'model': model, 'optimizer': optimizer})
 
-    train_loader = DataLoader(MoNuSeg(args.datapack, training=True), batch_size=64, shuffle=True)
+    train_loader = DataLoader(MoNuSeg(args.datapack, training=True), batch_size=32, shuffle=True)
     trainer.run(train_loader, max_epochs=args.max_epochs)
 
 
@@ -94,13 +93,12 @@ def build_argparser():
     ap.add_argument('--datapack', type=str, default='monuseg.pth')
     ap.add_argument('--name', type=str, default='nuse', help='name this run')
     ap.add_argument('--device', type=int, default=0, help='GPU Device ID')
-    ap.add_argument('--recover', type=str, default=None, help='snapshot file to recover')
+    ap.add_argument('--model_state', type=str, default=None, help='model state to recover')
 
     ap.add_argument('--max_epochs', type=int, default=128, help='how many epochs you want')
     ap.add_argument('--evaluate_interval', type=int, default=16)
 
     ap.add_argument('--snapshot_dir', type=str, default='snapshot', help='snapshot file to recover')
-    ap.add_argument('--snapshot_interval', type=int, default=16)
     ap.add_argument('--snapshot_interval', type=int, default=16)
     ap.add_argument('--snapshot_max_history', type=int, default=128)
 
@@ -114,6 +112,8 @@ def main():
     args = build_argparser().parse_args()
     if args.visdom_env is None:
         args.visdom_env = args.name
+    if 0 <= args.device < torch.cuda.device_count():
+        args.device = torch.device('cuda', args.device)
     train(args)
 
 
