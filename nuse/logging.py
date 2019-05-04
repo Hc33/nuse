@@ -43,18 +43,19 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
 
 def setup_training_logger(trainer, log_filename=None):
     logger = trainer._logger  # type: logging.Logger
+    logger.setLevel(logging.INFO)
     logger.handlers.clear()
+    logger.propagate = False
     fmt = logging.Formatter(fmt='[%(asctime)s][%(levelname)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     if log_filename is not None:
         writer = logging.FileHandler(log_filename)
-        writer.setLevel(logging.DEBUG)
+        writer.setLevel(logging.INFO)
         writer.setFormatter(fmt)
         logger.addHandler(writer)
     stream = logging.StreamHandler()
-    stream.setLevel(logging.DEBUG)
+    stream.setLevel(logging.INFO)
     stream.setFormatter(fmt)
     logger.addHandler(stream)
-    return logger
 
 
 def setup_testing_logger(evaluator, organs):
