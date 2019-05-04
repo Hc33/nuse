@@ -62,7 +62,7 @@ def criterion(hypot, label):
 def train(args):
     model = FCN().to(args.device)
     if args.model_state:
-        model.load_state_dict(torch.load(args.recover, 'cpu'))
+        model.load_state_dict(torch.load(args.model_state, 'cpu'))
     optimizer = Adadelta(model.parameters(), lr=args.lr)
     trainer = create_trainer(args.device, model, optimizer, criterion, clip_grad=args.clip_grad)
     train_loader = DataLoader(MoNuSeg(args.datapack, training=True), batch_size=args.batch_size, shuffle=True)
@@ -71,26 +71,25 @@ def train(args):
     so_test_loader = DataLoader(MoNuSeg(args.datapack, same_organ_testing=True), batch_size=2, shuffle=False)
     do_test_loader = DataLoader(MoNuSeg(args.datapack, different_organ_testing=True), batch_size=2, shuffle=False)
 
+    nuse.logging.setup_training_logger(trainer, args.log_filename)
     nuse.logging.setup_training_visdom_logger(trainer, model, optimizer, args)
     nuse.logging.setup_testing_logger(evaluator_so, organs=['Breast', 'Liver', 'Kidney', 'Prostate'])
     nuse.logging.setup_testing_logger(evaluator_do, organs=['Bladder', 'Colon', 'Stomach'])
 
-    logger = nuse.logging.setup_training_logger(trainer, args.log_filename)
-
     @trainer.on(Events.EPOCH_STARTED)
     def log_next_epoch(e: Engine):
-        logger.info(f'Starting epoch {e.state.epoch:4d} / {e.state.max_epochs:4d}')
+        e._logger.info(f'Starting epoch {e.state.epoch:4d} / {e.state.max_epochs:4d}')
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training_loss(e: Engine):
         epoch, iteration, loss = e.state.epoch, e.state.iteration, e.state.output.loss.overall
         iteration %= len(train_loader)
-        logger.info(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f}')
+        e._logger.info(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f}')
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def trigger_evaluation(e: Engine):
         if e.state.epoch % args.evaluate_interval == 0:
-            print(f'Starting evaluation')
+            e._logger.info(f'Starting evaluation')
             evaluator_so.run(so_test_loader)
             evaluator_do.run(do_test_loader)
 
