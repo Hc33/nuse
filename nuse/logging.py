@@ -41,7 +41,7 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
     return logger
 
 
-def setup_training_logger(trainer, log_filename=None):
+def setup_training_logger(trainer, log_filename, dataset_length):
     logger = trainer._logger  # type: logging.Logger
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
@@ -56,6 +56,16 @@ def setup_training_logger(trainer, log_filename=None):
     stream.setLevel(logging.INFO)
     stream.setFormatter(fmt)
     logger.addHandler(stream)
+
+    @trainer.on(Events.EPOCH_STARTED)
+    def log_next_epoch(e: Engine):
+        e._logger.info(f'Starting epoch {e.state.epoch:4d} / {e.state.max_epochs:4d}')
+
+    @trainer.on(Events.ITERATION_COMPLETED)
+    def log_training_loss(e: Engine):
+        epoch, iteration, loss = e.state.epoch, e.state.iteration, e.state.output.loss.overall
+        iteration %= dataset_length
+        e._logger.info(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f}')
 
 
 def setup_testing_logger(evaluator, organs):

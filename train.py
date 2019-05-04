@@ -27,20 +27,10 @@ def train(args):
     so_test_loader = DataLoader(MoNuSeg(args.datapack, same_organ_testing=True), batch_size=2, shuffle=False)
     do_test_loader = DataLoader(MoNuSeg(args.datapack, different_organ_testing=True), batch_size=2, shuffle=False)
 
-    nuse.logging.setup_training_logger(trainer, args.log_filename)
+    nuse.logging.setup_training_logger(trainer, log_filename=args.log_filename, dataset_length=len(train_loader))
     nuse.logging.setup_training_visdom_logger(trainer, model, optimizer, args)
     nuse.logging.setup_testing_logger(evaluator_so, organs=['Breast', 'Liver', 'Kidney', 'Prostate'])
     nuse.logging.setup_testing_logger(evaluator_do, organs=['Bladder', 'Colon', 'Stomach'])
-
-    @trainer.on(Events.EPOCH_STARTED)
-    def log_next_epoch(e: Engine):
-        e._logger.info(f'Starting epoch {e.state.epoch:4d} / {e.state.max_epochs:4d}')
-
-    @trainer.on(Events.ITERATION_COMPLETED)
-    def log_training_loss(e: Engine):
-        epoch, iteration, loss = e.state.epoch, e.state.iteration, e.state.output.loss.overall
-        iteration %= len(train_loader)
-        e._logger.info(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f}')
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def trigger_evaluation(e: Engine):
