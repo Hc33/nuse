@@ -3,6 +3,7 @@
 import ignite.contrib.handlers.visdom_logger as vl
 from ignite.engine import Engine, Events
 from nuse.monuseg import Unnormalize, MoNuSeg_STD, MoNuSeg_MEAN
+import logging
 
 
 def setup_training_visdom_logger(trainer, model, optimizer, args):
@@ -12,7 +13,7 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
                   log_handler=vl.OutputHandler(tag='loss', output_transform=lambda loss: {'loss': loss}))
 
     logger.attach(trainer, event_name=Events.EPOCH_COMPLETED,
-                  log_handler=vl.GradsScalarHandler(model))
+                  log_handler=vl.GradsScalarHandler(model.predict))
 
     logger.attach(trainer, event_name=Events.EPOCH_COMPLETED,
                   log_handler=vl.OptimizerParamsHandler(optimizer))
@@ -29,6 +30,21 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
         h_boundary = e.state.output.prediction[:4, 1:2]
         logger.vis.images(h_boundary, win='Boundary/h')
 
+    return logger
+
+
+def setup_training_logger(trainer, log_filename=None):
+    logger = trainer._logger  # type: logging.Logger
+    fmt = logging.Formatter(fmt='[%(asctime)s][%(levelname)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
+    if log_filename is not None:
+        writer = logging.FileHandler(log_filename)
+        writer.setLevel(logging.DEBUG)
+        writer.setFormatter(fmt)
+        logger.addHandler(writer)
+    stream = logging.StreamHandler()
+    stream.setLevel(logging.DEBUG)
+    stream.setFormatter(fmt)
+    logger.addHandler(stream)
     return logger
 
 
