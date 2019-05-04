@@ -70,7 +70,7 @@ class MoNuSegTransform:
         image, label = self.rot(image, label)
         image = self.norm(fn.to_tensor(image))
 
-        return image, torch.from_numpy(label).long()
+        return image, torch.from_numpy(label > 0).float()
 
 
 class MoNuSegTestTransform:
@@ -78,10 +78,10 @@ class MoNuSegTestTransform:
         self.norm = tr.Normalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD)
         self.pad = tr.Pad(12, padding_mode='reflect')
 
-    def __call__(self, image, mask):
+    def __call__(self, image, label):
         image = self.norm(fn.to_tensor(self.pad(image)))
-        mask = torch.from_numpy(mask)
-        return image, mask
+        label = torch.from_numpy(label > 0).float()
+        return image, label
 
 
 class MoNuSeg(Dataset):
