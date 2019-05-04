@@ -7,8 +7,8 @@ from torch.utils.data import Dataset
 import torchvision.transforms as tr
 import torchvision.transforms.functional as fn
 
-MoNuSeg_MEAN = [0.7198306, 0.43624926, 0.5741127]
-MoNuSeg_STD = [0.13865258, 0.18120667, 0.14840752]
+MoNuSeg_MEAN = [0.80994445, 0.59934306, 0.72003025]
+MoNuSeg_STD = [0.16179444, 0.21052812, 0.15706065]
 
 
 class ByPass:
