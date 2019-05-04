@@ -2,6 +2,8 @@
 
 import torch
 from torch.optim.adadelta import Adadelta
+from torch.optim.adam import Adam
+from torch.optim.sgd import SGD
 from torch.utils.data import DataLoader
 from nuse.fcn import FCN
 import argparse
@@ -49,6 +51,17 @@ def create_trainer(device: torch.device, model: torch.nn.Module, optimizer, loss
     return Engine(on_iteration)
 
 
+def create_optimizer(name, parameters, lr):
+    if name == 'Adadelta':
+        return Adadelta(parameters, lr=lr)
+    elif name == 'Adam':
+        return Adam(parameters, lr=lr)
+    elif name == 'SGD':
+        return SGD(parameters, lr=lr)
+    else:
+        raise KeyError('Unknown optimizer type {!r}. Choose from [Adadelta | Adam | SGD]')
+
+
 def criterion(hypot, label):
     h_outside, h_boundary, h_inside = map(lambda t: t.unsqueeze(1), torch.split(hypot, 1, dim=1))
     y_outside, y_boundary, y_inside = map(lambda t: t.unsqueeze(1), torch.split(label.float(), 1, dim=1))
@@ -63,7 +76,7 @@ def train(args):
     model = FCN().to(args.device)
     if args.model_state:
         model.load_state_dict(torch.load(args.model_state, 'cpu'))
-    optimizer = Adadelta(model.parameters(), lr=args.lr)
+    optimizer = create_optimizer(args.optimizer, model.parameters(), lr=args.lr)
     trainer = create_trainer(args.device, model, optimizer, criterion, clip_grad=args.clip_grad)
     train_loader = DataLoader(MoNuSeg(args.datapack, training=True), batch_size=args.batch_size, shuffle=True)
     evaluator_so = create_evaluator(model, metrics={}, device=args.device)
@@ -114,6 +127,7 @@ def build_argparser():
     ap.add_argument('--max_epochs', type=int, default=128, help='how many epochs you want')
     ap.add_argument('--evaluate_interval', type=int, default=16)
     ap.add_argument('--lr', type=float, default=1.0)
+    ap.add_argument('--optimizer', type=str, default='Adadelta')
     ap.add_argument('--batch_size', type=int, default=32)
     ap.add_argument('--clip_grad', type=float, default=50)
 
