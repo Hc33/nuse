@@ -64,7 +64,7 @@ def train(args):
     if args.model_state:
         model.load_state_dict(torch.load(args.recover, 'cpu'))
     optimizer = Adadelta(model.parameters(), lr=args.lr)
-    trainer = create_trainer(args.device, model, optimizer, criterion, criterion, clip_grad=args.clip_grad)
+    trainer = create_trainer(args.device, model, optimizer, criterion, clip_grad=args.clip_grad)
     train_loader = DataLoader(MoNuSeg(args.datapack, training=True), batch_size=args.batch_size, shuffle=True)
     evaluator_so = create_evaluator(model, metrics={}, device=args.device)
     evaluator_do = create_evaluator(model, metrics={}, device=args.device)
