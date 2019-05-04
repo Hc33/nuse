@@ -1,12 +1,13 @@
 # encoding: UTF-8
 
 import torch
+from nuse.trainer import MultiLoss
 
 
 def dice(h, y, eps=1e-5):
     intersection = (h * y).sum()
     union = h.sum() + y.sum()
-    return 1 - 2 * intersection / union
+    return 1 - 2 * (intersection + eps) / (union + eps)
 
 
 def bce_loss(h, y, k=None):

@@ -3,12 +3,14 @@
 import random
 import torch
 import numpy as np
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as tr
 import torchvision.transforms.functional as fn
 
 MoNuSeg_MEAN = [0.80994445, 0.59934306, 0.72003025]
 MoNuSeg_STD = [0.16179444, 0.21052812, 0.15706065]
+MoNUSeg_ORGANS_LISTS = [['Breast', 'Liver', 'Kidney', 'Prostate'],
+                        ['Bladder', 'Colon', 'Stomach']]
 
 
 class ByPass:
@@ -131,7 +133,7 @@ class MoNuSeg(Dataset):
         y = step_x * self.stride
         image, label, _ = self.dataset[sample_id]
         image = fn.crop(image, y, x, self.crop_size, self.crop_size)
-        label = label[:, y:y+self.crop_size, x:y+self.crop_size]
+        label = label[:, y:y + self.crop_size, x:y + self.crop_size]
         return self.transform(image, label)
 
     def test_sample(self, idx):
@@ -140,3 +142,10 @@ class MoNuSeg(Dataset):
 
     def get_regions(self, idx):
         return self.dataset[idx % len(self.dataset)][2]
+
+
+def create_loaders(datapack, batch_size):
+    train_loader = DataLoader(MoNuSeg(datapack, training=True), batch_size=batch_size, shuffle=True)
+    test_loader_so = DataLoader(MoNuSeg(datapack, same_organ_testing=True), batch_size=2, shuffle=False)
+    test_loader_do = DataLoader(MoNuSeg(datapack, different_organ_testing=True), batch_size=2, shuffle=False)
+    return train_loader, (test_loader_so, test_loader_do)

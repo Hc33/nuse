@@ -68,5 +68,5 @@ def setup_training_logger(trainer, log_filename, dataset_length):
         e._logger.info(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f}')
 
 
-def setup_testing_logger(evaluator, organs):
+def setup_testing_logger(evaluators, organ_lists):
     pass
