@@ -89,5 +89,5 @@ class FCN(nn.Module):
         return self.predict(out)
 
     @staticmethod
-    def output_transform(self, x, y, y_pred, regions):
+    def output_transform(x, y, y_pred, regions):
         return decode_batch(y_pred[:, 1], y_pred[:, 2])
