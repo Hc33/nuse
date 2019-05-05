@@ -1,10 +1,13 @@
 # encoding: UTF-8
 
-import ignite.contrib.handlers.visdom_logger as vl
-from ignite.engine import Engine, Events
-from nuse.monuseg import Unnormalize, MoNuSeg_STD, MoNuSeg_MEAN
-import logging
 import argparse
+import logging
+
+import ignite.contrib.handlers.visdom_logger as vl
+import torch
+from ignite.engine import Engine, Events
+
+from nuse.monuseg import Unnormalize, MoNuSeg_STD, MoNuSeg_MEAN
 
 
 def _get_loss(output):
@@ -37,6 +40,9 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
         y_boundary = label[:4, 1:2].float()
         logger.vis.images(y_boundary, win='Boundary/y')
         h_boundary = e.state.output.prediction[:4, 1:2]
+        # TODO implement these somewhere else
+        if args.criterion.lower() == 'lovasz':
+            h_boundary = torch.sigmoid(h_boundary)
         logger.vis.images(h_boundary, win='Boundary/h')
 
     return logger
