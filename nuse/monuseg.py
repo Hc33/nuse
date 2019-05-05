@@ -130,7 +130,7 @@ class MoNuSeg(Dataset):
             self.transform = MoNuSegTestTransform()
         self.crop_size = size
         self.stride = stride
-        self.step = image_size // stride
+        self.step = 1 + (image_size - size) // stride
         self.num_crops = self.step * self.step
 
     def __len__(self):

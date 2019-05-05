@@ -4,6 +4,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.functional import interpolate
+from nuse.utils.cnn3_decoder import decode_batch
 
 
 class DepthConv2d(nn.Sequential):
@@ -30,8 +31,7 @@ class UNetUpBlock(nn.Module):
         super().__init__()
         Conv2d = DepthConv2d if depthwise else nn.Conv2d
         self.up = nn.Sequential(
-            nn.ZeroPad2d(padding=(0, 1, 0, 1)),
-            Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=2, bias=False, padding=0),
+            Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=3, bias=False, padding=1),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(num_features=in_channels))
         self.merge = nn.Sequential(
@@ -49,7 +49,7 @@ class UNetUpBlock(nn.Module):
 
 
 class FCN(nn.Module):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         super().__init__()
         self.conv = UNetDownBlock(3, 32, stride=1, depthwise=False)
         self.down1 = UNetDownBlock(32, 64)
@@ -65,6 +65,8 @@ class FCN(nn.Module):
         self.up1 = UNetUpBlock(64, 32)
         self.out = UNetUpBlock(32, 32)
         self.predict = nn.Conv2d(in_channels=32, out_channels=3, kernel_size=1)
+
+        self.factor = 1
 
         for module in self.children():
             if isinstance(module, nn.Conv2d):
@@ -84,4 +86,8 @@ class FCN(nn.Module):
         up2 = self.up2(down2, up3)
         up1 = self.up1(down1, up2)
         out = self.out(conv, up1)
-        return torch.sigmoid(self.predict(out))
+        return self.predict(out)
+
+    @staticmethod
+    def output_transform(self, x, y, y_pred, regions):
+        return decode_batch(y_pred[:, 1], y_pred[:, 2])

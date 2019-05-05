@@ -4,6 +4,7 @@ import ignite.contrib.handlers.visdom_logger as vl
 from ignite.engine import Engine, Events
 from nuse.monuseg import Unnormalize, MoNuSeg_STD, MoNuSeg_MEAN
 import logging
+import argparse
 
 
 def _get_loss(output):
@@ -70,3 +71,15 @@ def setup_training_logger(trainer, log_filename, dataset_length):
 
 def setup_testing_logger(evaluators, organ_lists):
     pass
+
+
+def record_args(args: argparse.Namespace, logger: logging.Logger):
+    kv = args.__dict__
+    key_width = max(map(len, kv.keys()))
+    fmt = '{{:{}s}}: {{!r}}'.format(key_width)
+    for key, value in kv.items():
+        logger.info(fmt.format(key, value))
+
+
+def engine_logger(engine: Engine):
+    return engine._logger
