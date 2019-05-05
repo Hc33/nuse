@@ -22,7 +22,7 @@ def train(args):
 
     # setup dataset & trainers
     train_activation, test_activation, criterion = get_criterion(args.criterion)
-    train_loader, test_loaders = create_loaders(args.datapack, args.batch_size)
+    train_loader, test_loaders = create_loaders(args.datapack, args.batch_size, args.crop_size, args.crop_stride)
     trainer = create_trainer(args.device, model, optimizer, criterion,
                              activation=train_activation, clip_grad=args.clip_grad)
     evaluators = create_evaluators(args.device, model, test_loaders, metrics={}, activation=test_activation)
@@ -65,6 +65,8 @@ def build_argparser():
     ap.add_argument('--criterion', type=str, default='dice', help='one of {bce, dice, lovasz}')
     ap.add_argument('--optimizer', type=str, default='Adam')
     ap.add_argument('--batch_size', type=int, default=32)
+    ap.add_argument('--crop_size', type=int, default=256)
+    ap.add_argument('--crop_stride', type=int, default=248)
     ap.add_argument('--clip_grad', type=float)
 
     ap.add_argument('--snapshot_dir', type=str, default='snapshot', help='snapshot file to recover')

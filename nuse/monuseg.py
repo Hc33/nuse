@@ -159,8 +159,9 @@ class MoNuSeg(Dataset):
         return self.dataset[idx % len(self.dataset)][2]
 
 
-def create_loaders(datapack, batch_size):
-    train_loader = DataLoader(MoNuSeg(datapack, training=True), batch_size=batch_size, shuffle=True)
+def create_loaders(datapack, batch_size, size, stride):
+    train_loader = DataLoader(MoNuSeg(datapack, training=True, size=size, stride=stride),
+                              batch_size=batch_size, shuffle=True)
     test_loader_so = DataLoader(MoNuSeg(datapack, same_organ_testing=True), batch_size=2, shuffle=False)
     test_loader_do = DataLoader(MoNuSeg(datapack, different_organ_testing=True), batch_size=2, shuffle=False)
     return train_loader, (test_loader_so, test_loader_do)
