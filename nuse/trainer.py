@@ -87,7 +87,7 @@ def create_evaluator(device, model, region_fn, metrics, activation, non_blocking
 
 
 def create_evaluators(device, model, test_loaders, metrics, activation, non_blocking=False):
-    region_fn = [loader.dataset.get_region for loader in test_loaders]
+    region_fn = [loader.dataset.get_regions for loader in test_loaders]
     return (create_evaluator(device, model, region_fn[0], metrics, activation, non_blocking),
             create_evaluator(device, model, region_fn[1], metrics, activation, non_blocking))
 
