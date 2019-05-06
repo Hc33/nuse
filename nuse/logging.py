@@ -41,8 +41,8 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
         logger.vis.images(y_boundary, win='Boundary/y')
         h_boundary = e.state.output.prediction[:4, 1:2]
         # TODO implement these somewhere else
-        if args.criterion.lower() == 'lovasz':
-            h_boundary = torch.sigmoid(h_boundary)
+        if 'lovasz' in args.criterion.lower():
+            h_boundary = (h_boundary > 0).float()
         logger.vis.images(h_boundary, win='Boundary/h')
 
     return logger
