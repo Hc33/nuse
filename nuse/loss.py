@@ -46,13 +46,11 @@ def dice_criterion(h, y):
     return sum(loss) / len(loss)
 
 
-@meta_criterion
 def lovasz_criterion(h, y):
     h, y = h.squeeze(1), y.squeeze(1)
     return lovasz_hinge(h, y)
 
 
-@meta_criterion
 def symmetric_lovasz_criterion(h, y):
     h, y = h.squeeze(1), y.squeeze(1)
     return (lovasz_hinge(h, y) + lovasz_hinge(-h, 1 - y)) / 2
@@ -67,6 +65,6 @@ def get_criterion(name):
     elif name == 'lovasz':
         return None, torch.sigmoid, lovasz_criterion
     elif name == 'symmetric_lovasz':
-        return None, torch.sigmoid, lovasz_criterion
+        return None, torch.sigmoid, symmetric_lovasz_criterion
     else:
         raise NameError('Unknown criterion {!r}. Choose from {{bce, dice, lovasz, symmetric_lovasz}}'.format(name))

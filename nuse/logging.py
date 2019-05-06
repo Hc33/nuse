@@ -41,9 +41,9 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
         image, label = e.state.batch
         image = unnormalize(image[:4])
         logger.vis.images(image, win='Image')
-        y_boundary = label[:4, 1:2].float()
+        y_boundary = label[:4].float()
         logger.vis.images(y_boundary, win='Boundary/y')
-        h_boundary = e.state.output.prediction[:4, 1:2]
+        h_boundary = e.state.output.prediction[:4]
         # TODO implement these somewhere else
         if 'lovasz' in args.criterion.lower():
             h_boundary = (h_boundary > 0).float()

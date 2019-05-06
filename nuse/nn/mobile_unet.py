@@ -17,7 +17,6 @@ class UpBlock(torch.nn.Module):
             nuse.nn.mobilenetv2.InvertedResidual(bypass_in_channels, out_channels, 1, expand_ratio=6))
 
     def forward(self, bottom, bypass):
-        print(bottom.size(), bypass.size())
         bottom = self.upsample(bottom)
         return self.merge(torch.cat((bottom, bypass), dim=1))
 
@@ -26,8 +25,10 @@ class MobileUNet(torch.nn.Module):
     def __init__(self, pretrained: str = None):
         super().__init__()
         m2 = nuse.nn.mobilenetv2.MobileNetV2()
-        m2.load_state_dict(torch.load(pretrained, 'cpu'))
+        if pretrained is not None:
+            m2.load_state_dict(torch.load(pretrained, 'cpu'))
         features = m2.features
+        features[0][0].stride = 1, 1
         self.down1 = features[0:2]
         self.down2 = features[2:4]
         self.down3 = features[4:7]
@@ -39,7 +40,8 @@ class MobileUNet(torch.nn.Module):
         self.up1 = UpBlock(24, 16, 16)
         self.predict = torch.nn.Conv2d(in_channels=16, out_channels=3, kernel_size=1)
 
-        self.factor = 2
+        self.factor = 1
+        self.bottom_scale = 16
 
     def forward(self, x):
         down1 = self.down1(x)
@@ -52,3 +54,17 @@ class MobileUNet(torch.nn.Module):
         up2 = self.up2(up3, down2)
         up1 = self.up1(up2, down1)
         return self.predict(up1)
+
+
+if __name__ == '__main__':
+    def __debug_nuse_nn_mu__():
+        import torchstat
+        m = MobileUNet()
+        with torch.no_grad():
+            torchstat.stat(m, (3, 64, 64))
+            x = torch.zeros(1, 3, 64, 64)
+            h = m(x)
+        assert x.size(2) == h.size(2)
+        assert x.size(3) == h.size(3)
+
+    __debug_nuse_nn_mu__()
