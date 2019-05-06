@@ -45,11 +45,12 @@ class RandomRotate:
 
 class RandomMirror:
     def __call__(self, image, label):
-        if random.random() > 0.5:
+        destiny = random.random()
+        if 0 <= destiny < 1 / 3:
             # left-right
             image = fn.hflip(image)
             label = np.flip(label, (2,))
-        if random.random() > 0.5:
+        if 1 / 3 <= destiny < 2 / 3:
             # top-bottom
             image = fn.vflip(image)
             label = np.flip(label, (1,))
@@ -126,12 +127,14 @@ class MoNuSeg(Dataset):
         self.is_training = training
         if self.is_training:
             self.transform = MoNuSegTransform()
+            self.crop_size = size
+            self.stride = stride
+            self.step = 1 + (image_size - size) // stride
+            self.num_crops = self.step * self.step
         else:
             self.transform = MoNuSegTestTransform()
-        self.crop_size = size
-        self.stride = stride
-        self.step = 1 + (image_size - size) // stride
-        self.num_crops = self.step * self.step
+            self.crop_size, self.stride = image_size, image_size
+            self.step, self.num_crops = 1, 1
 
     def __len__(self):
         return len(self.dataset) * self.num_crops
