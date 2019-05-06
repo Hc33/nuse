@@ -36,14 +36,11 @@ def bce_criterion(h, y, k=None):
 
 
 def dice_criterion(h, y):
-    eps = 1e-5
-    loss = []
-    for h_i, y_i in zip(h, y):
-        intersection = (h_i * y_i).sum()
-        union = h_i.sum() + y_i.sum()
-        loss_i = 1 - 2 * (intersection + eps) / (union + eps)
-        loss.append(loss_i)
-    return sum(loss) / len(loss)
+    batch_size, eps = h.size(0), 1e-5
+    intersection = (h * y).view(batch_size, -1).sum(1)
+    union = h.view(batch_size, -1).sum(1) + y.view(batch_size, -1).sum(1)
+    loss = 1 - 2 * (intersection + eps) / (union + eps)
+    return loss.mean()
 
 
 def lovasz_criterion(h, y):
