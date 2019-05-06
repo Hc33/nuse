@@ -62,7 +62,7 @@ class FCN(nn.Module):
         self.up2 = UNetUpBlock(128, 64)
         self.up1 = UNetUpBlock(64, 32)
         self.out = UNetUpBlock(32, 32)
-        self.predict = nn.Conv2d(in_channels=32, out_channels=3, kernel_size=1)
+        self.predict = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=1)
 
         self.factor = 1
         self.bottom_scale = 32

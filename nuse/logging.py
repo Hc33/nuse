@@ -10,8 +10,12 @@ from ignite.engine import Engine, Events
 from nuse.monuseg import Unnormalize, MoNuSeg_STD, MoNuSeg_MEAN
 
 
-def _get_loss(output):
+def _get_loss(output, overall_only=False):
     loss = output.loss
+    if torch.is_tensor(loss):
+        return loss.item()
+    if overall_only:
+        return loss.overall.item()
     return dict(overall=loss.overall.item(),
                 inside=loss.inside.item(),
                 boundary=loss.boundary.item(),
@@ -70,7 +74,7 @@ def setup_training_logger(trainer, log_filename, dataset_length):
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training_loss(e: Engine):
-        epoch, iteration, loss = e.state.epoch, e.state.iteration, e.state.output.loss.overall
+        epoch, iteration, loss = e.state.epoch, e.state.iteration, _get_loss(e.state.output, overall_only=True)
         iteration %= dataset_length
         e._logger.info(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f}')
 

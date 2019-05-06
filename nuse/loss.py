@@ -35,12 +35,15 @@ def bce_criterion(h, y, k=None):
     return (worst + random) / 2
 
 
-@meta_criterion
 def dice_criterion(h, y):
     eps = 1e-5
-    intersection = (h * y).sum()
-    union = h.sum() + y.sum()
-    return 1 - 2 * (intersection + eps) / (union + eps)
+    loss = []
+    for h_i, y_i in zip(h, y):
+        intersection = (h_i * y_i).sum()
+        union = h_i.sum() + y_i.sum()
+        loss_i = 1 - 2 * (intersection + eps) / (union + eps)
+        loss.append(loss_i)
+    return sum(loss) / len(loss)
 
 
 @meta_criterion

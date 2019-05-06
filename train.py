@@ -28,10 +28,10 @@ def train(args):
     evaluators = create_evaluators(args.device, model, test_loaders, metrics={}, activation=test_activation)
 
     # setup logging
-    nuse.logging.record_args(args, nuse.logging.engine_logger(trainer))
     nuse.logging.setup_training_logger(trainer, log_filename=args.log_filename, dataset_length=len(train_loader))
     nuse.logging.setup_training_visdom_logger(trainer, model, optimizer, args)
     nuse.logging.setup_testing_logger(evaluators, nuse.monuseg.MoNUSeg_ORGANS_LISTS)
+    nuse.logging.record_args(args, nuse.logging.engine_logger(trainer))
 
     # setup evaluation during training
     setup_evaluation(trainer, args.evaluate_interval, evaluators, test_loaders)

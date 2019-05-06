@@ -151,11 +151,12 @@ class MoNuSeg(Dataset):
         y = step_x * self.stride
         image, label, _ = self.dataset[sample_id]
         image = fn.crop(image, y, x, self.crop_size, self.crop_size)
-        label = label[:, y:y + self.crop_size, x:y + self.crop_size]
+        label = label[1:2, y:y + self.crop_size, x:y + self.crop_size]
         return self.transform(image, label)
 
     def test_sample(self, idx):
         image, label, _ = self.dataset[idx % len(self.dataset)]
+        label = label[1:2]
         return self.transform(image, label)
 
     def get_regions(self, idx):
