@@ -37,10 +37,12 @@ def bce_criterion(h, y, k=None):
 
 @meta_criterion
 def dice_criterion(h, y):
-    eps = 1e-5
-    intersection = (h * y).sum()
-    union = h.sum() + y.sum()
-    return 1 - 2 * (intersection + eps) / (union + eps)
+    batch_size, eps = h.size(0), 1e-5
+    h, y = h.view(batch_size, -1), y.view(batch_size, -1)
+    intersection = (h * y).sum(1)
+    union = h.sum(1) + y.sum(1)
+    loss = 1 - 2 * (intersection + eps) / (union + eps)
+    return loss.mean()
 
 
 @meta_criterion
