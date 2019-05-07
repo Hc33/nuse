@@ -14,6 +14,6 @@ def get_model(ns, *args, **kwargs) -> torch.nn.Module:
     elif name == 'mobileunet':
         return MobileUNet(ns.mobile_v2_pretrained)
     elif name == 'resunet':
-        return ResUNet()
+        return ResUNet(use_attention=ns.use_attention)
     else:
         raise KeyError('Unknown model {!r}. Choose one from {{FCN, MobileUNet}}'.format(ns.model))

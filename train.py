@@ -56,6 +56,7 @@ def build_argparser():
     ap.add_argument('--device', type=int, default=0, help='GPU Device ID. Note: it will be convert to `torch.device`')
     ap.add_argument('--model_state', type=str, default=None, help='model state to load')
     ap.add_argument('--model', type=str, default='FCN', help='one of {FCN, MobileUNet}')
+    ap.add_argument('--use_attention', action='store_true', default=False)
     ap.add_argument('--mobile_v2_pretrained', type=str, default='mobilenetv2.pth',
                     help='path of pretrained model for MobileNetV2')
 
