@@ -8,13 +8,30 @@ import torch.nn.init
 import pretrainedmodels.models.dpn as dpn
 from nuse.nn.common import UpBlock, ConvBNReLU, hyper_column
 from nuse.nn.init import recursively_initialize
-from torch.nn.functional import interpolate
+from torch.utils.checkpoint import checkpoint
+import functools
+
+
+@functools.wraps(checkpoint)
+def checkpoint_with_hyper_column(fn):
+    def __fn_with_hyper_column__(*args):
+        return fn(hyper_column(*args))
+
+    def __optimizied__(*args):
+        return checkpoint(__fn_with_hyper_column__, *args)
+
+    return __optimizied__
 
 
 class DPDecoder(UpBlock):
     def forward(self, down, bypass):
-        if not torch.is_tensor(bypass):
-            bypass = torch.cat(bypass, dim=1)
+        if torch.is_tensor(bypass):
+            return super().forward(down, bypass)
+        else:
+            return checkpoint(self.forward_efficient, down, *bypass)
+
+    def forward_efficient(self, down, *bypass):
+        bypass = torch.cat(bypass, dim=1)
         return super().forward(down, bypass)
 
 
@@ -37,6 +54,8 @@ class DPUNet(torch.nn.Module):
         self.predict = torch.nn.Sequential(
             ConvBNReLU(256, 64, 3, 1, 1),
             torch.nn.Conv2d(64, 3, 1))
+
+        self.predict_efficient = checkpoint_with_hyper_column(self.predict.forward)
         recursively_initialize(self.predict, torch.nn.Conv2d, torch.nn.init.kaiming_normal_)
 
     def forward(self, x):
@@ -49,7 +68,7 @@ class DPUNet(torch.nn.Module):
         d3 = self.decoder3(d4, e3)
         d2 = self.decoder2(d3, e2)
         d1 = self.decoder1(d2, e1)
-        return self.predict(hyper_column(d4, d3, d2, d1))
+        return self.predict_efficient(d4, d3, d2, d1)
 
 
 if __name__ == '__main__':
