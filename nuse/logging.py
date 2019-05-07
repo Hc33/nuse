@@ -71,7 +71,7 @@ def setup_training_logger(trainer, log_filename, dataset_length):
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training_loss(e: Engine):
         epoch, iteration, loss = e.state.epoch, e.state.iteration, e.state.output.loss.overall
-        iteration %= dataset_length
+        iteration = 1 + (iteration - 1) % dataset_length
         e._logger.info(f'Epoch {epoch:4d} Iteration {iteration:4d} loss = {loss:.4f}')
 
 
