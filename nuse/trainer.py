@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from ignite.engine import Engine, Events
 from ignite.engine import _prepare_batch as prepare_batch
+from ignite.utils import convert_tensor
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adadelta import Adadelta
 from torch.optim.adam import Adam
@@ -65,18 +66,17 @@ def create_trainer(device: torch.device, model: torch.nn.Module, optimizer, loss
 def create_evaluator(device: torch.device, model: Module, loader: DataLoader, activation, non_blocking=False):
     region_fn = loader.dataset.get_regions
 
-    def inference(e, batch):
+    def inference(e, x):
         model.eval()
         with torch.no_grad():
-            x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+            x = convert_tensor(x, device=device, non_blocking=non_blocking)
             batch_size = x.size(0)
             y_pred = model(x)
             if activation is not None:
                 y_pred = activation(y_pred)
             regions = [region_fn(i) for i in range(engine.state.index, engine.state.index + batch_size)]
             e.state.index += batch_size
-            prediction = model.output_transform(x, y, y_pred, regions)
-            return Prediction(prediction=prediction, regions=regions)
+            return Prediction(prediction=y_pred, regions=regions)
 
     engine = Engine(inference)
 

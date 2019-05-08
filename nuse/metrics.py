@@ -115,10 +115,13 @@ def aji_metric(binary: np.ndarray, regions: [((int, int, int, int), np.ndarray)]
 
 
 class AJIMetric(Metric):
-    def __init__(self, threshold=0.5):
-        super().__init__()
+    def __init__(self, threshold=0.5, padding=12, target_size=1000):
         self.aji_for_all = []
         self.threshold = threshold
+        self.padding = padding
+        self.target_size = target_size
+        self.crop = slice(self.padding, self.padding + self.target_size)
+        super().__init__()
 
     def reset(self):
         self.aji_for_all.clear()
@@ -126,10 +129,11 @@ class AJIMetric(Metric):
     def update(self, predictions: Prediction):
         batch_size = predictions.prediction.size(0)
         for i in range(batch_size):
-            _, boundary, inside = predictions.prediction[i]
+            boundary, inside = predictions.prediction[i, 1:, self.crop, self.crop]
             regions = predictions.regions[i]
-            boundary = (boundary > self.threshold).byte().cpu().numpy()
+            boundary = (boundary > self.threshold).int()
             inside = (((inside > self.threshold).int() - boundary) > self.threshold).byte().cpu().numpy()
+            boundary = boundary.byte().cpu().numpy()
             inside = area_filter(inside, threshold=32)
             inside = cv2.erode(inside, np.array([[0, 1, 1], [1, 1, 1], [0, 1, 1]], dtype=np.uint8))
             decoded = decode(boundary, inside).astype(np.uint8)

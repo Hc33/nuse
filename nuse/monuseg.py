@@ -95,10 +95,9 @@ class MoNuSegTestTransform:
         self.norm = tr.Normalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD)
         self.pad = tr.Pad(12, padding_mode='reflect')
 
-    def __call__(self, image, label):
+    def __call__(self, image):
         image = self.norm(fn.to_tensor(self.pad(image)))
-        label = torch.from_numpy(label > 0).float()
-        return image, label
+        return image
 
 
 class MoNuSeg(Dataset):
@@ -151,8 +150,8 @@ class MoNuSeg(Dataset):
         return self.transform(image, label)
 
     def test_sample(self, idx):
-        image, label, _ = self.dataset[idx % len(self.dataset)]
-        return self.transform(image, label)
+        image = self.dataset[idx % len(self.dataset)][0]
+        return self.transform(image)
 
     def get_regions(self, idx):
         return self.dataset[idx % len(self.dataset)][2]
