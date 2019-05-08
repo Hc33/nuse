@@ -14,25 +14,33 @@ from nuse.trainer import create_optimizer, create_trainer, create_evaluator, set
 
 
 def train(args):
+    # create logger
+    logger = nuse.logging.create_logger(args.log_filename)
+
     # create model & optimizer
+    logger.info(f'Creating model {args.model!r}')
     model = get_model(args).to(args.device)
     if args.model_state:
         model.load_state_dict(torch.load(args.model_state, 'cpu'))
+    logger.info(f'Creating optimizer {args.optimizer!r}')
     optimizer = create_optimizer(args.optimizer, model.parameters(), lr=args.lr)
 
-    # setup dataset & trainers
+    # setup dataset
+    logger.info('Creating data sets & data loaders')
     train_activation, test_activation, criterion = get_criterion(args.criterion)
     train_loader, test_loader = create_loaders(args.datapack, args.batch_size, args.crop_size, args.crop_stride)
+
+    # setup trainers
+    logger.info('Creating trainer & evaluator')
     trainer = create_trainer(args.device, model, optimizer, criterion,
                              activation=train_activation, clip_grad=args.clip_grad)
     evaluator = create_evaluator(args.device, model, test_loader, activation=test_activation)
 
     # setup logging
-    logger = nuse.logging.create_logger(args.log_filename)
     nuse.logging.echo_args(logger, args)
     nuse.logging.setup_training_logger(trainer, logger)
-    nuse.logging.setup_training_visdom_logger(trainer, model, optimizer, args)
     nuse.logging.setup_testing_logger(evaluator, logger, nuse.monuseg.MoNUSeg_TEST_ORGANS)
+    nuse.logging.setup_visdom_logger(trainer, evaluator, model, optimizer, args)
 
     # setup evaluation during training
     setup_evaluation(trainer, args.evaluate_interval, evaluator, test_loader)
@@ -47,6 +55,7 @@ def train(args):
                               {'model': model, 'optimizer': optimizer})
 
     # launch training
+    logger.info('Starting training')
     trainer.run(train_loader, max_epochs=args.max_epochs)
 
 

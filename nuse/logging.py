@@ -18,7 +18,7 @@ def _get_loss(output):
                 outside=loss.outside.item())
 
 
-def setup_training_visdom_logger(trainer, model, optimizer, args):
+def setup_visdom_logger(trainer, evaluator, model, optimizer, args):
     logger = vl.VisdomLogger(args.visdom_server, args.visdom_port, env=args.visdom_env, use_incoming_socket=False)
 
     logger.attach(trainer, event_name=Events.ITERATION_COMPLETED,
@@ -29,6 +29,9 @@ def setup_training_visdom_logger(trainer, model, optimizer, args):
 
     logger.attach(trainer, event_name=Events.EPOCH_COMPLETED,
                   log_handler=vl.OptimizerParamsHandler(optimizer))
+
+    logger.attach(evaluator, event_name=Events.EPOCH_COMPLETED,
+                  log_handler=vl.OutputHandler(tag='validation', metric_names=['AJI'], another_engine=trainer))
 
     unnormalize = Unnormalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD, inplace=True)
 
