@@ -1,8 +1,14 @@
 # encoding: UTF-8
 
+import statistics
+
 import cv2
 import numpy as np
 import torch
+from ignite.metrics import Metric
+
+from nuse.trainer import Prediction
+from nuse.utils.cnn3_decoder import decode
 
 
 def iou(x, y):
@@ -106,3 +112,30 @@ def aji_metric(binary: np.ndarray, regions: [((int, int, int, int), np.ndarray)]
 
     # A <- C / U
     return correct_pixels / union_pixels, correct_pixels, union_pixels
+
+
+class AJIMetric(Metric):
+    def __init__(self, threshold=0.5):
+        super().__init__()
+        self.aji_for_all = []
+        self.threshold = threshold
+
+    def reset(self):
+        self.aji_for_all.clear()
+
+    def update(self, predictions: Prediction):
+        batch_size = predictions.prediction.size(0)
+        for i in range(batch_size):
+            _, boundary, inside = predictions.prediction[i]
+            regions = predictions.regions[i]
+            boundary = (boundary > self.threshold).byte().cpu().numpy()
+            inside = (((inside > self.threshold).int() - boundary) > self.threshold).byte().cpu().numpy()
+            inside = area_filter(inside, threshold=32)
+            inside = cv2.erode(inside, np.array([[0, 1, 1], [1, 1, 1], [0, 1, 1]], dtype=np.uint8))
+            decoded = decode(boundary, inside).astype(np.uint8)
+            result = area_filter(decoded, threshold=32)
+            aji, _, _ = aji_metric(result, regions)
+            self.aji_for_all.append(aji)
+
+    def compute(self):
+        return statistics.mean(self.aji_for_all)

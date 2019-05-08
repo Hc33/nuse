@@ -10,8 +10,10 @@ from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adadelta import Adadelta
 from torch.optim.adam import Adam
 from torch.optim.sgd import SGD
+from torch.utils.data import DataLoader
+from torch.nn import Module
 
-__all__ = ['MultiLoss', 'Output', 'create_trainer', 'create_evaluators', 'create_optimizer', 'setup_evaluation']
+__all__ = ['MultiLoss', 'Output', 'create_trainer', 'create_evaluator', 'create_optimizer', 'setup_evaluation']
 
 
 @dataclass
@@ -60,7 +62,9 @@ def create_trainer(device: torch.device, model: torch.nn.Module, optimizer, loss
     return Engine(on_iteration)
 
 
-def create_evaluator(device, model, region_fn, metrics, activation, non_blocking=False):
+def create_evaluator(device: torch.device, model: Module, loader: DataLoader, activation, non_blocking=False):
+    region_fn = loader.dataset.get_regions
+
     def inference(e, batch):
         model.eval()
         with torch.no_grad():
@@ -69,27 +73,18 @@ def create_evaluator(device, model, region_fn, metrics, activation, non_blocking
             y_pred = model(x)
             if activation is not None:
                 y_pred = activation(y_pred)
-            regions = [region_fn[i] for i in range(engine.state.index, engine.state.index + batch_size)]
+            regions = [region_fn(i) for i in range(engine.state.index, engine.state.index + batch_size)]
             e.state.index += batch_size
             prediction = model.output_transform(x, y, y_pred, regions)
             return Prediction(prediction=prediction, regions=regions)
 
     engine = Engine(inference)
 
-    for name, metric in metrics.items():
-        metric.attach(engine, name)
-
     @engine.on(Events.EPOCH_STARTED)
     def init_index(e: Engine):
         e.state.index = 0
 
     return engine
-
-
-def create_evaluators(device, model, test_loaders, metrics, activation, non_blocking=False):
-    region_fn = [loader.dataset.get_regions for loader in test_loaders]
-    return (create_evaluator(device, model, region_fn[0], metrics, activation, non_blocking),
-            create_evaluator(device, model, region_fn[1], metrics, activation, non_blocking))
 
 
 def create_optimizer(name, parameters, lr):
@@ -103,9 +98,8 @@ def create_optimizer(name, parameters, lr):
         raise KeyError('Unknown optimizer type {!r}. Choose from [Adadelta | Adam | SGD]')
 
 
-def setup_evaluation(trainer, interval, evaluators, data_sources):
+def setup_evaluation(trainer, interval, evaluator, data_loader):
     @trainer.on(Events.EPOCH_COMPLETED)
     def trigger_evaluation(e: Engine):
         if e.state.epoch % interval == 0:
-            for evaluator, data in zip(evaluators, data_sources):
-                evaluator.run(data)
+            evaluator.run(data_loader)

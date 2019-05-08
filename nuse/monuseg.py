@@ -9,8 +9,7 @@ import torchvision.transforms.functional as fn
 
 MoNuSeg_MEAN = [0.80994445, 0.59934306, 0.72003025]
 MoNuSeg_STD = [0.16179444, 0.21052812, 0.15706065]
-MoNUSeg_ORGANS_LISTS = [['Breast', 'Liver', 'Kidney', 'Prostate'],
-                        ['Bladder', 'Colon', 'Stomach']]
+MoNUSeg_TEST_ORGANS = ['Breast', 'Liver', 'Kidney', 'Prostate', 'Bladder', 'Colon', 'Stomach']
 
 
 class ByPass:
@@ -103,12 +102,10 @@ class MoNuSegTestTransform:
 
 
 class MoNuSeg(Dataset):
-    def __init__(self, pth_file: str, size=256, stride=248,
-                 training=False, same_organ_testing=False, different_organ_testing=False,
-                 image_size=1000):
+    def __init__(self, pth_file: str, size=256, stride=248, training=False, testing=False, image_size=1000):
         self.pth_file = pth_file
-        error_message = 'choose one of training | same_organ_testing | different_organ_testing, no less, no more.'
-        if int(training) + int(same_organ_testing) + int(different_organ_testing) != 1:
+        error_message = 'choose one of {training, testing}, no less, no more.'
+        if int(training) + int(testing) != 1:
             raise ValueError(error_message)
         dataset = torch.load(self.pth_file)
         by_patient_id = dataset['by_patient_id']
@@ -116,10 +113,9 @@ class MoNuSeg(Dataset):
 
         if training:
             pid = by_organ['Breast'][:4] + by_organ['Liver'][:4] + by_organ['Kidney'][:4] + by_organ['Prostate'][:4]
-        elif same_organ_testing:
-            pid = by_organ['Breast'][4:] + by_organ['Liver'][4:] + by_organ['Kidney'][4:] + by_organ['Prostate'][4:]
-        elif different_organ_testing:
-            pid = by_organ['Bladder'] + by_organ['Colon'] + by_organ['Stomach']
+        elif testing:
+            pid = by_organ['Breast'][4:] + by_organ['Liver'][4:] + by_organ['Kidney'][4:] + by_organ['Prostate'][4:] + \
+                  by_organ['Bladder'] + by_organ['Colon'] + by_organ['Stomach']
         else:
             raise ValueError(error_message)
 
@@ -165,6 +161,5 @@ class MoNuSeg(Dataset):
 def create_loaders(datapack, batch_size, size, stride):
     train_loader = DataLoader(MoNuSeg(datapack, training=True, size=size, stride=stride),
                               batch_size=batch_size, shuffle=True)
-    test_loader_so = DataLoader(MoNuSeg(datapack, same_organ_testing=True), batch_size=2, shuffle=False)
-    test_loader_do = DataLoader(MoNuSeg(datapack, different_organ_testing=True), batch_size=2, shuffle=False)
-    return train_loader, (test_loader_so, test_loader_do)
+    test_loader = DataLoader(MoNuSeg(datapack, testing=True), batch_size=2, shuffle=False)
+    return train_loader, test_loader

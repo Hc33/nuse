@@ -10,7 +10,7 @@ import nuse.logging
 from nuse.nn.lookup import get_model
 from nuse.loss import get_criterion
 from nuse.monuseg import create_loaders
-from nuse.trainer import create_optimizer, create_trainer, create_evaluators, setup_evaluation
+from nuse.trainer import create_optimizer, create_trainer, create_evaluator, setup_evaluation
 
 
 def train(args):
@@ -22,19 +22,20 @@ def train(args):
 
     # setup dataset & trainers
     train_activation, test_activation, criterion = get_criterion(args.criterion)
-    train_loader, test_loaders = create_loaders(args.datapack, args.batch_size, args.crop_size, args.crop_stride)
+    train_loader, test_loader = create_loaders(args.datapack, args.batch_size, args.crop_size, args.crop_stride)
     trainer = create_trainer(args.device, model, optimizer, criterion,
                              activation=train_activation, clip_grad=args.clip_grad)
-    evaluators = create_evaluators(args.device, model, test_loaders, metrics={}, activation=test_activation)
+    evaluator = create_evaluator(args.device, model, test_loader, activation=test_activation)
 
     # setup logging
-    nuse.logging.record_args(args, nuse.logging.engine_logger(trainer))
-    nuse.logging.setup_training_logger(trainer, log_filename=args.log_filename, dataset_length=len(train_loader))
+    logger = nuse.logging.create_logger(args.log_filename)
+    nuse.logging.echo_args(logger, args)
+    nuse.logging.setup_training_logger(trainer, logger)
     nuse.logging.setup_training_visdom_logger(trainer, model, optimizer, args)
-    nuse.logging.setup_testing_logger(evaluators, nuse.monuseg.MoNUSeg_ORGANS_LISTS)
+    nuse.logging.setup_testing_logger(evaluator, logger, nuse.monuseg.MoNUSeg_TEST_ORGANS)
 
     # setup evaluation during training
-    setup_evaluation(trainer, args.evaluate_interval, evaluators, test_loaders)
+    setup_evaluation(trainer, args.evaluate_interval, evaluator, test_loader)
 
     # setup checkpoint policy
     trainer.add_event_handler(Events.EPOCH_COMPLETED,
