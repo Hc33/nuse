@@ -19,6 +19,8 @@ def _get_loss(output):
 
 
 def setup_visdom_logger(trainer, evaluator, model, optimizer, args):
+    if args.disable_visdom:
+        return
     logger = vl.VisdomLogger(args.visdom_server, args.visdom_port, env=args.visdom_env, use_incoming_socket=False)
 
     logger.attach(trainer, event_name=Events.ITERATION_COMPLETED,

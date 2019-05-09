@@ -81,9 +81,10 @@ def build_argparser():
     ap.add_argument('--clip_grad', type=float)
 
     ap.add_argument('--snapshot_dir', type=str, default='snapshot', help='snapshot file to recover')
-    ap.add_argument('--snapshot_interval', type=int, default=16)
+    ap.add_argument('--snapshot_interval', type=int, default=8)
     ap.add_argument('--snapshot_max_history', type=int, default=128)
 
+    ap.add_argument('--disable_visdom', action='store_true', default=False)
     ap.add_argument('--visdom_server', type=str, default='localhost')
     ap.add_argument('--visdom_port', type=int, default=8097)
     ap.add_argument('--visdom_env', type=str, default=None)
