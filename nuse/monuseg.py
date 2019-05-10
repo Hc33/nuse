@@ -6,10 +6,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as tr
 import torchvision.transforms.functional as fn
-
-MoNuSeg_MEAN = [0.80994445, 0.59934306, 0.72003025]
-MoNuSeg_STD = [0.16179444, 0.21052812, 0.15706065]
-MoNUSeg_TEST_ORGANS = ['Breast', 'Liver', 'Kidney', 'Prostate', 'Bladder', 'Colon', 'Stomach']
+from MoNuSeg import traits
 
 
 class ByPass:
@@ -77,10 +74,10 @@ class Unnormalize:
 
 
 class MoNuSegTransform:
-    def __init__(self):
+    def __init__(self, mean, std):
         self.rot = RandomRotate()
         self.mirror = RandomMirror()
-        self.norm = tr.Normalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD)
+        self.norm = tr.Normalize(mean, std)
 
     def __call__(self, image, label):
         image, label = self.rot(image, label)
@@ -91,8 +88,8 @@ class MoNuSegTransform:
 
 
 class MoNuSegTestTransform:
-    def __init__(self):
-        self.norm = tr.Normalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD)
+    def __init__(self, mean, std):
+        self.norm = tr.Normalize(mean, std)
         self.pad = tr.Pad(12, padding_mode='reflect')
 
     def __call__(self, image):
@@ -106,33 +103,35 @@ class MoNuSeg(Dataset):
         error_message = 'choose one of {training, testing}, no less, no more.'
         if int(training) + int(testing) != 1:
             raise ValueError(error_message)
-        dataset = torch.load(self.pth_file)
-        by_patient_id = dataset['by_patient_id']
-        by_organ = dataset['by_organ']
+        source = torch.load(self.pth_file)
 
         if training:
-            pid = by_organ['Breast'][:4] + by_organ['Liver'][:4] + by_organ['Kidney'][:4] + by_organ['Prostate'][:4]
+            self.tissues = traits.get_training_tissues()
         elif testing:
-            pid = by_organ['Breast'][4:] + by_organ['Liver'][4:] + by_organ['Kidney'][4:] + by_organ['Prostate'][4:] + \
-                  by_organ['Bladder'] + by_organ['Colon'] + by_organ['Stomach']
+            self.tissues = traits.get_testing_tissues()
         else:
             raise ValueError(error_message)
 
-        self.dataset = [by_patient_id[p][:3] for p in pid]
+        self.images = traits.tissue_filter(source['images'], self.tissues)
+        self.labels = traits.tissue_filter(source['labels'], self.tissues)
+        self.attentions = traits.tissue_filter(source['attentions'], self.tissues)
+        self.mean = source['mean']
+        self.std = source['std']
+
         self.is_training = training
         if self.is_training:
-            self.transform = MoNuSegTransform()
+            self.transform = MoNuSegTransform(self.mean, self.std)
             self.crop_size = size
             self.stride = stride
             self.step = 1 + (image_size - size) // stride
             self.num_crops = self.step * self.step
         else:
-            self.transform = MoNuSegTestTransform()
+            self.transform = MoNuSegTestTransform(self.mean, self.std)
             self.crop_size, self.stride = image_size, image_size
             self.step, self.num_crops = 1, 1
 
     def __len__(self):
-        return len(self.dataset) * self.num_crops
+        return len(self.images) * self.num_crops
 
     def __getitem__(self, idx):
         if self.is_training:
@@ -144,17 +143,18 @@ class MoNuSeg(Dataset):
         step_y, step_x = divmod(crop_id, self.step)
         x = step_x * self.stride
         y = step_x * self.stride
-        image, label, _ = self.dataset[sample_id]
+        image = self.images[sample_id]
+        label = self.labels[sample_id]
         image = fn.crop(image, y, x, self.crop_size, self.crop_size)
         label = label[:, y:y + self.crop_size, x:y + self.crop_size]
         return self.transform(image, label)
 
     def test_sample(self, idx):
-        image = self.dataset[idx % len(self.dataset)][0]
+        image = self.images[idx % len(self.images)]
         return self.transform(image)
 
-    def get_regions(self, idx):
-        return self.dataset[idx % len(self.dataset)][2]
+    def get_annotation(self, idx):
+        return self.attentions[idx % len(self.attentions)]
 
 
 def create_loaders(datapack, batch_size, size, stride):

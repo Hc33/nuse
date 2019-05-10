@@ -4,7 +4,8 @@ import enum
 from dataclasses import dataclass
 
 __all__ = ['Organ', 'TumorType', 'Disease', 'Tissue',
-           'get_stain_normalization_target', 'get_training_set', 'get_val_set', 'get_all_tissues']
+           'get_stain_normalization_target', 'get_training_tissues', 'get_testing_tissues', 'get_all_tissues',
+           'tissue_filter']
 
 
 class Organ(enum.Enum):
@@ -83,11 +84,15 @@ def get_stain_normalization_target() -> Tissue:
     return MONUSEG_DETAILS[20]
 
 
-def get_training_set() -> [Tissue]:
+def get_training_tissues() -> [Tissue]:
     indies = [0, 1, 2, 3, 6, 7, 8, 9, 12, 13, 14, 15, 18, 19, 20, 21]
     return [MONUSEG_DETAILS[i] for i in indies]
 
 
-def get_val_set() -> [Tissue]:
+def get_testing_tissues() -> [Tissue]:
     indies = [4, 5, 10, 11, 16, 17, 22, 23, 24, 25, 26, 27, 28, 29]
     return [MONUSEG_DETAILS[i] for i in indies]
+
+
+def tissue_filter(mapping, tissues):
+    return [mapping[t.patient_id] for t in tissues]
