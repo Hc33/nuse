@@ -2,7 +2,7 @@
 
 from lxml import etree
 from zipfile import ZipFile
-from MoNuSeg.details import Tissue
+from MoNuSeg.traits import Tissue
 from dataclasses import dataclass
 import numpy as np
 
