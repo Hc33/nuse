@@ -67,8 +67,11 @@ def parse_region(region):
     bbox = BoundingBox(x, y, w, h)
     pixel_length = float(attributes['Length'])
     pixel_area = float(attributes['Area'])
-    real_length = float(attributes['LengthMicrons'])
-    real_area = float(attributes['AreaMicrons'])
+    try:
+        real_length = float(attributes['LengthMicrons'])
+        real_area = float(attributes['AreaMicrons'])
+    except:
+        real_length, real_area = None, None
     return Region(contour=contour, box=bbox,
                   area_px=pixel_area, area_um=real_area, length_px=pixel_length, length_um=real_length)
 

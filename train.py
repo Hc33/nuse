@@ -7,6 +7,7 @@ from ignite.engine import Events
 from ignite.handlers import ModelCheckpoint
 
 import nuse.logging
+import MoNuSeg.traits
 from nuse.nn.lookup import get_model
 from nuse.loss import get_criterion
 from nuse.monuseg import create_loaders
@@ -28,7 +29,7 @@ def train(args):
     # setup dataset
     logger.info('Creating data sets & data loaders')
     train_activation, test_activation, criterion = get_criterion(args.criterion)
-    train_loader, test_loader = create_loaders(args.datapack, args.batch_size, args.crop_size, args.crop_stride)
+    train_loader, test_loader, unnormalize_fn = create_loaders(args.datapack, args.batch_size, args.crop_size, args.crop_stride)
 
     # setup trainers
     logger.info('Creating trainer & evaluator')
@@ -39,8 +40,8 @@ def train(args):
     # setup logging
     nuse.logging.echo_args(logger, args)
     nuse.logging.setup_training_logger(trainer, logger)
-    nuse.logging.setup_testing_logger(evaluator, logger, nuse.monuseg.MoNUSeg_TEST_ORGANS)
-    nuse.logging.setup_visdom_logger(trainer, evaluator, model, optimizer, args)
+    nuse.logging.setup_testing_logger(evaluator, logger, MoNuSeg.traits.get_testing_organ_names())
+    nuse.logging.setup_visdom_logger(trainer, evaluator, model, optimizer, unnormalize_fn, args)
 
     # setup evaluation during training
     setup_evaluation(trainer, args.evaluate_interval, evaluator, test_loader)

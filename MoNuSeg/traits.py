@@ -96,3 +96,14 @@ def get_testing_tissues() -> [Tissue]:
 
 def tissue_filter(mapping, tissues):
     return [mapping[t.patient_id] for t in tissues]
+
+
+def get_testing_organ_names(one_by_one=True) -> [str]:
+    organs = ["Breast", "Kidney", "Liver", "Prostate", "Bladder", "Colon", "Stomach"]
+    if one_by_one:
+        xs = []
+        for organ in organs:
+            xs.append(organ)
+            xs.append(organ)
+        return xs
+    return organs

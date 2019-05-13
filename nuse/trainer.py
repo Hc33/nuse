@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-import numpy as np
 import torch
 from ignite.engine import Engine, Events
 from ignite.engine import _prepare_batch as prepare_batch
@@ -13,6 +12,8 @@ from torch.optim.adam import Adam
 from torch.optim.sgd import SGD
 from torch.utils.data import DataLoader
 from torch.nn import Module
+
+from MoNuSeg.parser import Annotation
 
 __all__ = ['MultiLoss', 'Output', 'create_trainer', 'create_evaluator', 'create_optimizer', 'setup_evaluation']
 
@@ -37,7 +38,7 @@ class Output:
 @dataclass
 class Prediction:
     prediction: torch.tensor
-    regions: [np.ndarray]
+    annotations: [Annotation]
 
 
 def create_trainer(device: torch.device, model: torch.nn.Module, optimizer, loss_fn,
@@ -64,7 +65,7 @@ def create_trainer(device: torch.device, model: torch.nn.Module, optimizer, loss
 
 
 def create_evaluator(device: torch.device, model: Module, loader: DataLoader, activation, non_blocking=False):
-    region_fn = loader.dataset.get_regions
+    annotation_fn = loader.dataset.get_annotation
 
     def inference(e, x):
         model.eval()
@@ -74,9 +75,9 @@ def create_evaluator(device: torch.device, model: Module, loader: DataLoader, ac
             y_pred = model(x)
             if activation is not None:
                 y_pred = activation(y_pred)
-            regions = [region_fn(i) for i in range(engine.state.index, engine.state.index + batch_size)]
+            annotations = [annotation_fn(i) for i in range(engine.state.index, engine.state.index + batch_size)]
             e.state.index += batch_size
-            return Prediction(prediction=y_pred, regions=regions)
+            return Prediction(prediction=y_pred, annotations=annotations)
 
     engine = Engine(inference)
 

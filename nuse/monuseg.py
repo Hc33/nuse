@@ -114,7 +114,7 @@ class MoNuSeg(Dataset):
 
         self.images = traits.tissue_filter(source['images'], self.tissues)
         self.labels = traits.tissue_filter(source['labels'], self.tissues)
-        self.attentions = traits.tissue_filter(source['attentions'], self.tissues)
+        self.annotations = traits.tissue_filter(source['annotations'], self.tissues)
         self.mean = source['mean']
         self.std = source['std']
 
@@ -154,11 +154,12 @@ class MoNuSeg(Dataset):
         return self.transform(image)
 
     def get_annotation(self, idx):
-        return self.attentions[idx % len(self.attentions)]
+        return self.annotations[idx % len(self.annotations)]
 
 
 def create_loaders(datapack, batch_size, size, stride):
     train_loader = DataLoader(MoNuSeg(datapack, training=True, size=size, stride=stride),
                               batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(MoNuSeg(datapack, testing=True), batch_size=2, shuffle=False)
-    return train_loader, test_loader
+    mean, std = train_loader.dataset.mean, train_loader.dataset.std
+    return train_loader, test_loader, Unnormalize(mean, std)

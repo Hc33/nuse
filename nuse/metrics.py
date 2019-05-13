@@ -130,7 +130,7 @@ class AJIMetric(Metric):
         batch_size = predictions.prediction.size(0)
         for i in range(batch_size):
             boundary, inside = predictions.prediction[i, 1:, self.crop, self.crop]
-            regions = predictions.regions[i]
+            annotation = predictions.annotations[i]
             boundary = (boundary > self.threshold).int()
             inside = (((inside > self.threshold).int() - boundary) > self.threshold).byte().cpu().numpy()
             boundary = boundary.byte().cpu().numpy()
@@ -138,7 +138,7 @@ class AJIMetric(Metric):
             inside = cv2.erode(inside, np.array([[0, 1, 1], [1, 1, 1], [0, 1, 1]], dtype=np.uint8))
             decoded = decode(boundary, inside).astype(np.uint8)
             result = area_filter(decoded, threshold=32)
-            aji, _, _ = aji_metric(result, regions)
+            aji, _, _ = aji_metric(result, annotation.regions.round().astype(np.int32))
             self.aji_for_all.append(aji)
 
     def compute(self):

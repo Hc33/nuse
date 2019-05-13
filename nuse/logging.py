@@ -6,7 +6,7 @@ import logging
 import ignite.contrib.handlers.visdom_logger as vl
 from ignite.engine import Engine, Events
 
-from nuse.monuseg import Unnormalize, MoNuSeg_STD, MoNuSeg_MEAN
+from nuse.monuseg import Unnormalize
 from nuse.metrics import AJIMetric
 
 
@@ -18,7 +18,7 @@ def _get_loss(output):
                 outside=loss.outside.item())
 
 
-def setup_visdom_logger(trainer, evaluator, model, optimizer, args):
+def setup_visdom_logger(trainer, evaluator, model, optimizer, unnormalize_fn,  args):
     if args.disable_visdom:
         return
     logger = vl.VisdomLogger(args.visdom_server, args.visdom_port, env=args.visdom_env, use_incoming_socket=False)
@@ -35,20 +35,20 @@ def setup_visdom_logger(trainer, evaluator, model, optimizer, args):
     logger.attach(evaluator, event_name=Events.EPOCH_COMPLETED,
                   log_handler=vl.OutputHandler(tag='validation', metric_names=['AJI'], another_engine=trainer))
 
-    unnormalize = Unnormalize(mean=MoNuSeg_MEAN, std=MoNuSeg_STD, inplace=True)
-
     @trainer.on(Events.EPOCH_COMPLETED)
     def visualize_first_sample(e: Engine):
         image, label = e.state.batch
-        image = unnormalize(image[:4])
+        image = unnormalize_fn(image[:4])
         logger.vis.images(image, win='Image')
-        y_boundary = label[:4, 1:2].float()
-        logger.vis.images(y_boundary, win='Boundary/y')
-        h_boundary = e.state.output.prediction[:4, 1:2]
-        # TODO implement these somewhere else
-        if 'lovasz' in args.criterion.lower():
-            h_boundary = (h_boundary > 0).float()
-        logger.vis.images(h_boundary, win='Boundary/h')
+
+        for title, channel in zip(['Boundary', 'Inside'], [slice(1, 2), slice(2, 3)]):
+            y = label[:4, channel].float()
+            logger.vis.images(y, win=f'{title}/y')
+            h = e.state.output.prediction[:4, channel]
+            # TODO implement these somewhere else
+            if 'lovasz' in args.criterion.lower():
+                h = (h > 0).float()
+            logger.vis.images(h, win=f'{title}/h')
 
     return logger
 
@@ -112,7 +112,7 @@ def setup_testing_logger(evaluator: (Engine, AJIMetric), logger: logging.Logger,
         batch_size = e.state.output.prediction.size(0)
         start = batch_size * (e.state.iteration - 1)
         for i in range(start, start + batch_size):
-            organ = organ_lists[i // 2]
+            organ = organ_lists[i]
             aji = metric.aji_for_all[i]
             logger.info(f'Organ = {organ:8s} AJI = {aji:.4f}')
 

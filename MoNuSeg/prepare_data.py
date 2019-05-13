@@ -48,17 +48,18 @@ def build_normalizer():
     return normalizer
 
 
-def normalize():
-    def fn(tissue: Tissue):
-        print('[StainNormalize]', tissue.patient_id)
-        normalizer = build_normalizer()
-        image = staintools.read_image(f'./Tissue/{tissue.patient_id}.tif')
-        image = staintools.LuminosityStandardizer.standardize(image)
-        image = normalizer.transform(image)
-        cv2.imwrite(f'./Tissue/norm_{tissue.patient_id}.png', cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+def _normalize_fn(tissue: Tissue):
+    print('[StainNormalize]', tissue.patient_id)
+    normalizer = build_normalizer()
+    image = staintools.read_image(f'./Tissue/{tissue.patient_id}.tif')
+    image = staintools.LuminosityStandardizer.standardize(image)
+    image = normalizer.transform(image)
+    cv2.imwrite(f'./Tissue/norm_{tissue.patient_id}.png', cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
+
+def normalize():
     pool = multiprocessing.pool.Pool()
-    pool.map(fn, get_all_tissues())
+    pool.map(_normalize_fn, get_all_tissues())
 
 
 def on_region(region):
@@ -75,7 +76,7 @@ def render(height: int, width: int, anno: Annotation):
         if region.area_px < 32:
             continue
         canvas[...] = 0
-        cv2.fillPoly(canvas, [region], 1)
+        cv2.fillPoly(canvas, [region.contour.round().astype(np.int32)], 1)
         dilated = cv2.dilate(canvas, kernel)
         eroded = cv2.erode(canvas, kernel)
         mask = dilated > 0
